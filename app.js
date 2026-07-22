@@ -15,9 +15,10 @@
      · the rule   → is also the scrubber.
 
    Cost: one grain quad + one thin strip per row, all sharing a
-   single program. No models, no post stack.
+   single program. Raw WebGL2, no engine, no dependencies — this
+   draws N textured rectangles, which is ~2% of what a scene graph
+   is for, and three.js costs 126KB gzipped on the critical path.
    ============================================================ */
-import * as THREE from "three";
 
 /* ---------------- tunables ---------------- */
 const P = {
@@ -235,42 +236,54 @@ rows.forEach((r, i) => {
   r.scrub.addEventListener("pointercancel", end);
 });
 
-/* ---------------- GL ---------------- */
-let renderer, scene, cam, grain, W = 1, H = 1, GL_OK = true;
+/* ---------------- GL (raw WebGL2 — no engine) ---------------- */
+let gl = null, W = 1, H = 1, GL_OK = true;
+const DPR = Math.min(window.devicePixelRatio || 1, P.dpr);
 try {
-  renderer = new THREE.WebGLRenderer({ canvas, antialias: false, alpha: true, powerPreference: "low-power" });
-  renderer.setClearColor(0x000000, 0);
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, P.dpr));
-  scene = new THREE.Scene();
-  cam = new THREE.OrthographicCamera(0, 1, 0, 1, -10, 10);   // top=0 → pixel space, y down
+  gl = canvas.getContext("webgl2", {
+    alpha: true, antialias: false, depth: false, stencil: false,
+    premultipliedAlpha: true, powerPreference: "low-power",
+  });
+  if (!gl) throw new Error("no webgl2");
 } catch (e) {
   GL_OK = false;
   document.body.classList.add("no-gl");
 }
 
 const C = {
-  hair: new THREE.Color(0xe4dfd8),
-  ink:  new THREE.Color(0x2b2333),
-  pink: new THREE.Color(0xcc5f97),
+  hair: [0xe4 / 255, 0xdf / 255, 0xd8 / 255],
+  ink:  [0x2b / 255, 0x23 / 255, 0x33 / 255],
+  pink: [0xcc / 255, 0x5f / 255, 0x97 / 255],
 };
 
-const VERT = `
-  varying vec2 vUv;
-  void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`;
+/* every quad is an axis-aligned rectangle in CSS pixels, so the "camera" is
+   two divides. No matrices, and no culling (WebGL leaves CULL_FACE off), which
+   is also why the winding trap that bit the three.js version cannot happen. */
+const VERT = `#version 300 es
+  in vec2 aPos;
+  uniform vec4 uRect;      // x, y, w, h in CSS px, y down from the module top
+  uniform vec2 uRes;       // module size in CSS px
+  out vec2 vUv;
+  void main(){
+    vUv = aPos;
+    vec2 p = uRect.xy + aPos * uRect.zw;
+    gl_Position = vec4(p.x / uRes.x * 2.0 - 1.0, 1.0 - p.y / uRes.y * 2.0, 0.0, 1.0);
+  }`;
 
-const WAVE_FRAG = `
+const WAVE_FRAG = `#version 300 es
   precision highp float;
-  varying vec2 vUv;
+  in vec2 vUv;
   uniform float uW, uH, uAmp, uAA, uRest, uProg, uPlay, uHover, uPluck, uSweep, uLevel;
   uniform sampler2D uWave;
   uniform vec3 cHair, cInk, cPink;
+  out vec4 fragColor;
 
   void main(){
     float x = vUv.x;
     float yPix = (vUv.y - 0.5) * uH;
 
     /* THE SONG ITSELF — a real envelope measured from the master */
-    float pk = texture2D(uWave, vec2(x, 0.5)).r;
+    float pk = texture(uWave, vec2(x, 0.5)).r;
 
     /* a whisper at rest, full height once you touch it or play it */
     float gain = mix(uRest, 1.0, max(uHover, uPlay));
@@ -309,58 +322,94 @@ const WAVE_FRAG = `
     a = max(a, max(tick * 0.42, bead));
 
     if (a <= 0.003) discard;
-    gl_FragColor = vec4(col, clamp(a, 0.0, 1.0));
+    fragColor = vec4(col, clamp(a, 0.0, 1.0));
   }`;
 
-const quad = GL_OK ? new THREE.PlaneGeometry(1, 1) : null;
+const GRAIN_FRAG = `#version 300 es
+  precision highp float;
+  in vec2 vUv;
+  uniform float uT;
+  out vec4 fragColor;
+  float h(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+  void main(){
+    float g = h(gl_FragCoord.xy + fract(uT) * 7.0) * 0.030;
+    float edge = smoothstep(0.0, 0.16, vUv.y) * smoothstep(1.0, 0.84, vUv.y);
+    fragColor = vec4(vec3(0.0), g * (0.35 + 0.65 * edge));
+  }`;
 
-if (GL_OK) {
-  /* paper grain — the family's signature, one quad */
-  grain = new THREE.Mesh(quad, new THREE.ShaderMaterial({
-    transparent: true, depthTest: false, depthWrite: false, side: THREE.DoubleSide,
-    uniforms: { uT: { value: 0 } },
-    vertexShader: VERT,
-    fragmentShader: `
-      precision highp float;
-      varying vec2 vUv;
-      uniform float uT;
-      float h(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
-      void main(){
-        float g = h(gl_FragCoord.xy + fract(uT) * 7.0) * 0.030;
-        float edge = smoothstep(0.0, 0.16, vUv.y) * smoothstep(1.0, 0.84, vUv.y);
-        gl_FragColor = vec4(vec3(0.0), g * (0.35 + 0.65 * edge));
-      }`,
-  }));
-  grain.renderOrder = 0;
-  scene.add(grain);
+let WAVE = null, GRAIN = null, vao = null;
 
-  rows.forEach((r) => {
-    r.waveTex = new THREE.DataTexture(r.wave, r.wave.length, 1, THREE.RedFormat);
-    r.waveTex.minFilter = THREE.LinearMipmapLinearFilter;   // clean when squeezed onto a phone
-    r.waveTex.magFilter = THREE.LinearFilter;
-    r.waveTex.generateMipmaps = true;
-    r.waveTex.needsUpdate = true;
-
-    r.u = {
-      uW: { value: 1 }, uH: { value: P.waveH }, uAmp: { value: P.amp },
-      uAA: { value: 1 / Math.min(window.devicePixelRatio || 1, P.dpr) },
-      uRest: { value: P.restGain },
-      uProg: { value: -1 }, uPlay: { value: 0 }, uHover: { value: 0 },
-      uPluck: { value: 1 }, uSweep: { value: -1 }, uLevel: { value: 0 },
-      uWave: { value: r.waveTex },
-      cHair: { value: C.hair }, cInk: { value: C.ink }, cPink: { value: C.pink },
-    };
-    /* DoubleSide is REQUIRED: the pixel-space camera (top:0, bottom:H) puts a
-       negative Y scale in the projection matrix, which flips triangle winding —
-       FrontSide quads get backface-culled and render nothing at all. */
-    r.mesh = new THREE.Mesh(quad, new THREE.ShaderMaterial({
-      transparent: true, depthTest: false, depthWrite: false, side: THREE.DoubleSide,
-      uniforms: r.u, vertexShader: VERT, fragmentShader: WAVE_FRAG,
-    }));
-    r.mesh.renderOrder = 1;
-    scene.add(r.mesh);
-  });
+function compile(type, src) {
+  const s = gl.createShader(type);
+  gl.shaderSource(s, src);
+  gl.compileShader(s);
+  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
+    throw new Error("shader: " + gl.getShaderInfoLog(s));
+  }
+  return s;
 }
+
+function build(vsSrc, fsSrc) {
+  const p = gl.createProgram();
+  gl.attachShader(p, compile(gl.VERTEX_SHADER, vsSrc));
+  gl.attachShader(p, compile(gl.FRAGMENT_SHADER, fsSrc));
+  gl.bindAttribLocation(p, 0, "aPos");
+  gl.linkProgram(p);
+  if (!gl.getProgramParameter(p, gl.LINK_STATUS)) {
+    throw new Error("link: " + gl.getProgramInfoLog(p));
+  }
+  const u = {};
+  const n = gl.getProgramParameter(p, gl.ACTIVE_UNIFORMS);
+  for (let i = 0; i < n; i++) {
+    const info = gl.getActiveUniform(p, i);
+    u[info.name] = gl.getUniformLocation(p, info.name);
+  }
+  return { p, u };
+}
+
+/* everything the context owns, rebuildable after a context loss */
+function initGL() {
+  if (!GL_OK) return;
+  try {
+    WAVE  = build(VERT, WAVE_FRAG);
+    GRAIN = build(VERT, GRAIN_FRAG);
+  } catch (e) {
+    GL_OK = false;
+    document.body.classList.add("no-gl");
+    return;
+  }
+
+  vao = gl.createVertexArray();
+  gl.bindVertexArray(vao);
+  const vbo = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([0, 0, 1, 0, 0, 1, 1, 1]), gl.STATIC_DRAW);
+  gl.enableVertexAttribArray(0);
+  gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+
+  gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+  rows.forEach((r) => {
+    r.tex = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, r.tex);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, r.wave.length, 1, 0, gl.RED, gl.UNSIGNED_BYTE, r.wave);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+    gl.generateMipmap(gl.TEXTURE_2D);          // clean when squeezed onto a phone
+  });
+
+  gl.disable(gl.DEPTH_TEST);
+  gl.enable(gl.BLEND);
+  gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA, gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+}
+
+/* per-row shader state — plain numbers, uploaded at draw time */
+rows.forEach((r) => {
+  r.u = { uW: 1, uProg: -1, uPlay: 0, uHover: 0, uPluck: 1, uSweep: -1, uLevel: 0 };
+});
+
+initGL();
 
 /* ---------------- layout ---------------- */
 let postedH = -1;
@@ -370,20 +419,18 @@ function layout() {
   H = Math.max(1, Math.round(mod.clientHeight || box.height));
 
   if (GL_OK) {
-    renderer.setSize(W, H, false);
-    cam.right = W; cam.bottom = H; cam.updateProjectionMatrix();
-    grain.position.set(W / 2, H / 2, 0);
-    grain.scale.set(W, H, 1);
+    const cw = Math.round(W * DPR), ch = Math.round(H * DPR);
+    if (canvas.width !== cw || canvas.height !== ch) { canvas.width = cw; canvas.height = ch; }
+    gl.viewport(0, 0, cw, ch);
   }
 
   rows.forEach((r) => {
     const b = r.scrub.getBoundingClientRect();
     r.px.left = b.left - box.left;
     r.px.width = Math.max(1, b.width);
-    if (!GL_OK) return;
-    r.mesh.position.set(r.px.left + r.px.width / 2, b.top - box.top + b.height / 2, 0);
-    r.mesh.scale.set(r.px.width, P.waveH, 1);
-    r.u.uW.value = r.px.width;
+    /* the strip is centred on the scrub band, taller than it */
+    r.px.top = b.top - box.top + b.height / 2 - P.waveH / 2;
+    r.u.uW = r.px.width;
   });
 
   postHeight();
@@ -476,41 +523,81 @@ function step(dt) {
     }
 
     if (GL_OK) {
-      r.u.uHover.value = r.hover;
-      r.u.uPlay.value  = r.play;
-      r.u.uPluck.value = reduced ? 1 : r.pluck;
-      r.u.uSweep.value = sw;
-      r.u.uLevel.value = isCur ? level : 0;
-      r.u.uProg.value  = isCur ? prog : -1;
+      r.u.uHover = r.hover;
+      r.u.uPlay  = r.play;
+      r.u.uPluck = reduced ? 1 : r.pluck;
+      r.u.uSweep = sw;
+      r.u.uLevel = isCur ? level : 0;
+      r.u.uProg  = isCur ? prog : -1;
       /* debug: __ckp.poster(i, 0.4) pins a row as part-played so the played
          look can be inspected without waiting on (or seeking) real audio */
-      if (r.poster != null) { r.u.uProg.value = r.poster; r.u.uPlay.value = 1; r.u.uLevel.value = 0.55; }
+      if (r.poster != null) { r.u.uProg = r.poster; r.u.uPlay = 1; r.u.uLevel = 0.55; }
     } else {
       r.bar.style.setProperty("--p", isCur && prog > 0 ? prog : 0);
     }
   });
-
-  if (GL_OK) grain.material.uniforms.uT.value = reduced ? 0 : tSec;
 }
 
-function frame() { if (GL_OK) renderer.render(scene, cam); }
+function frame() {
+  if (!GL_OK || gl.isContextLost()) return;
 
-let running = false;
+  gl.clearColor(0, 0, 0, 0);
+  gl.clear(gl.COLOR_BUFFER_BIT);
+  gl.bindVertexArray(vao);
+
+  /* paper grain — the family's signature, one quad */
+  gl.useProgram(GRAIN.p);
+  gl.uniform2f(GRAIN.u.uRes, W, H);
+  gl.uniform4f(GRAIN.u.uRect, 0, 0, W, H);
+  gl.uniform1f(GRAIN.u.uT, reduced ? 0 : tSec);
+  gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+
+  /* one strip per song, all through the same program */
+  gl.useProgram(WAVE.p);
+  gl.uniform2f(WAVE.u.uRes, W, H);
+  gl.uniform1f(WAVE.u.uH, P.waveH);
+  gl.uniform1f(WAVE.u.uAmp, P.amp);
+  gl.uniform1f(WAVE.u.uAA, 1 / DPR);
+  gl.uniform1f(WAVE.u.uRest, P.restGain);
+  gl.uniform3fv(WAVE.u.cHair, C.hair);
+  gl.uniform3fv(WAVE.u.cInk, C.ink);
+  gl.uniform3fv(WAVE.u.cPink, C.pink);
+  gl.uniform1i(WAVE.u.uWave, 0);
+  gl.activeTexture(gl.TEXTURE0);
+
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i], u = r.u;
+    gl.bindTexture(gl.TEXTURE_2D, r.tex);
+    gl.uniform4f(WAVE.u.uRect, r.px.left, r.px.top, r.px.width, P.waveH);
+    gl.uniform1f(WAVE.u.uW, u.uW);
+    gl.uniform1f(WAVE.u.uProg, u.uProg);
+    gl.uniform1f(WAVE.u.uPlay, u.uPlay);
+    gl.uniform1f(WAVE.u.uHover, u.uHover);
+    gl.uniform1f(WAVE.u.uPluck, u.uPluck);
+    gl.uniform1f(WAVE.u.uSweep, u.uSweep);
+    gl.uniform1f(WAVE.u.uLevel, u.uLevel);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+  }
+}
+
+let running = false, rafId = 0;
+function tick() {
+  const n = nowS(), dt = Math.min(n - lastT, 0.1);
+  lastT = n;
+  step(dt);
+  frame();
+  rafId = requestAnimationFrame(tick);
+}
 function start() {
   if (running || !GL_OK) return;
   running = true;
   lastT = nowS();
-  renderer.setAnimationLoop(() => {
-    const n = nowS(), dt = Math.min(n - lastT, 0.1);
-    lastT = n;
-    step(dt);
-    frame();
-  });
+  rafId = requestAnimationFrame(tick);
 }
 function stop() {
-  if (!running || !GL_OK) return;
+  if (!running) return;
   running = false;
-  renderer.setAnimationLoop(null);
+  cancelAnimationFrame(rafId);
 }
 
 /* pause rendering off-screen — but NEVER while a song is playing, and any
@@ -538,14 +625,17 @@ setTimeout(postHeight, 1600);
 
 /* ---------------- resilience ---------------- */
 if (GL_OK) {
-  canvas.addEventListener("webglcontextlost", (e) => { e.preventDefault(); }, false);
-  canvas.addEventListener("webglcontextrestored", () => { layout(); frame(); }, false);
+  canvas.addEventListener("webglcontextlost", (e) => { e.preventDefault(); stop(); }, false);
+  /* programs, buffers and textures all die with the context — rebuild them */
+  canvas.addEventListener("webglcontextrestored", () => {
+    initGL(); layout(); frame(); start();
+  }, false);
 }
 addEventListener("pageshow", (e) => {
   if (!e.persisted) return;
   if (GL_OK) {
-    const gl = renderer.getContext && renderer.getContext();
-    if (gl && gl.isContextLost && gl.isContextLost()) { location.reload(); return; }
+    // iOS restores the page from bfcache with a silently dead context
+    if (gl.isContextLost()) { location.reload(); return; }
     layout(); frame(); start();
   }
   postedH = -1; postHeight();
@@ -554,7 +644,7 @@ addEventListener("pageshow", (e) => {
 /* ---------------- debug ---------------- */
 window.__ckp = {
   P, rows, audio,
-  get gl() { return { renderer, scene, cam, W, H, running, info: renderer && renderer.info }; },
+  get glState() { return { gl, W, H, DPR, running, lost: GL_OK && gl.isContextLost() }; },
   play: (i) => play(i),
   hover: (i) => { setHot(i); step(1 / 60); frame(); },
   renderOnce: (n = 1) => { for (let i = 0; i < n; i++) { step(1 / 60); frame(); } },

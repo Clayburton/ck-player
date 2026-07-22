@@ -18,9 +18,22 @@ choruses are tall, breakdowns are thin, outros taper.
 - **the rule is the scrubber** — click or drag it to seek.
 - **idle** — every ~11s a slow sweep passes down the list and lifts each shape.
 
-Vanilla HTML/CSS/JS + three.js. No build step, no React, no Tailwind, no models,
-no post stack: one grain quad plus one thin strip per row, all sharing a single
+Vanilla HTML/CSS/JS + **raw WebGL2**. No build step, no framework, no engine, no
+dependencies: one grain quad plus one thin strip per row, all sharing a single
 shader program.
+
+### Why not three.js
+
+It was three.js at first. But the whole piece draws N axis-aligned textured
+rectangles with one fragment shader — no scene, no camera, no geometry, no
+loader — and three costs **126KB gzipped** on the critical path for machinery
+that is never touched. Dropping it took the whole page from ~145KB to **19.6KB
+gzipped**, with pixel-identical output (the GLSL is the same; only the boilerplate
+changed). Same call the `three-little-birds` poster made, for the same reason.
+
+Because the "camera" is now two divides in the vertex shader, there are no
+matrices — and no culling, since WebGL leaves `CULL_FACE` off. That makes the
+winding trap documented below impossible here.
 
 ## The module is exactly as tall as its list
 
@@ -82,7 +95,7 @@ deployed. Don't chase that as a bug.
 
 | file | what it is |
 |---|---|
-| `index.html` | shell + importmap (three pinned to the same jsDelivr URL as the other pieces, so it's a shared CDN cache hit). Bump `?v=N` after every edit. |
+| `index.html` | shell. Loads only the two font faces the CSS actually renders. Bump `?v=N` after every edit. |
 | `styles.css` | type, row grid, states. Brand tokens at the top. |
 | `app.js` | the engine — shader, audio graph, analyser recording, interaction. Tunables in `P` at the top. |
 | `playlists.js` | **the only file you edit per placement.** |
@@ -95,12 +108,15 @@ Preview: launch config `ck-player`, port **8856**.
 
 ## Notes for future me
 
-- **`side: THREE.DoubleSide` is required on every mesh.** The camera is an
-  orthographic *pixel-space* camera (`top:0, bottom:H`) so DOM coordinates map
-  straight to world coordinates — but that puts a negative Y scale in the
-  projection matrix, which flips triangle winding. With the default `FrontSide`
-  every quad is backface-culled: draw calls count, zero fragments, blank canvas,
-  no error. Cost half an hour once.
+- **(historical, from the three.js version)** A pixel-space orthographic camera
+  (`top:0, bottom:H`) puts a negative Y scale in the projection matrix, which
+  flips triangle winding — with the default `FrontSide` every quad is
+  backface-culled: draw calls count, zero fragments, blank canvas, no error. It
+  needed `side: THREE.DoubleSide`. Raw WebGL2 can't hit this (no matrices, and
+  `CULL_FACE` is off by default), but the trap is worth remembering for the
+  other pieces in this workspace.
+- **Only load the font faces you render.** This was pulling Courier Prime 700,
+  Courier Prime italic and Playfair 600 — three files the CSS never draws.
 - **Peak alone is useless on these masters.** They're brick-walled, so a raw peak
   envelope sits pinned near maximum for the whole song and draws a featureless
   sausage. `waveforms.py` is RMS-led (that tracks the arrangement) with peak
