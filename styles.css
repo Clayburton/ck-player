@@ -253,24 +253,20 @@ body { overflow-y: hidden; }            /* the parent grows to fit; we never scr
   justify-self: end;
 }
 
-/* the centre button — same object as the one on the experience-i-am banner */
+/* the centre link — identical to [ experience i am ] beside it, just centred */
 .foot__cta {
   justify-self: center;
   font-family: var(--mono);
-  font-size: clamp(11px, 1.4vw, 14px);
-  letter-spacing: .18em;
+  font-size: clamp(11px, 1.25vw, 13px);
+  letter-spacing: .16em;
   text-transform: lowercase;
   text-decoration: none;
   white-space: nowrap;
   color: var(--ink);
-  border: 1px solid var(--ink);
-  background: var(--paper);
-  padding: .8em 1.5em;
-  transition: background .12s ease, color .12s ease, transform .12s ease;
+  transition: color .15s ease;
 }
 .foot__cta:hover,
-.foot__cta:focus-visible { background: var(--ink); color: var(--paper); outline: none; }
-.foot__cta:active { transform: scale(.97); }
+.foot__cta:focus-visible { color: var(--pink); outline: none; }
 .foot__cta:empty { display: none; }
 
 /* touch has no hover, so the play affordance would never appear — show it */
