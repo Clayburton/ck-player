@@ -1,0 +1,61 @@
+<!-- =======================================================================
+     clay and kelsy — the player
+     Paste this whole block into a Custom HTML block wherever you want a
+     track list (bottom of /music/, an album page, a song page…).
+
+     TO CHANGE THE SONGS: change ?list=music in the iframe src below to any
+     playlist key defined in playlists.js. Nothing else changes.
+       ?list=music  → three little birds + the whole "i am" EP  (this page)
+       ?list=i-am   → the "i am" EP on its own
+
+     The iframe auto-grows to exactly the height of its list — five songs
+     make a five-song-tall player. Never set a fixed height here.
+
+     Host: https://clayburton.github.io/ck-player/
+     ======================================================================= -->
+<div id="ckp-embed">
+  <iframe id="ckp-frame"
+          src="https://clayburton.github.io/ck-player/?list=music"
+          title="Listen — clay and kelsy"
+          scrolling="no" loading="lazy"
+          allow="autoplay"
+          style="display:block;width:100%;height:700px;border:0;"></iframe>
+</div>
+
+<style>
+  /* full-bleed out of the content column. To keep the player INSIDE the
+     column instead, delete the three lines marked below. */
+  #ckp-embed{
+    width:100vw;                 /* delete for in-column */
+    position:relative;           /* delete for in-column */
+    left:50%; transform:translateX(-50%);   /* delete for in-column */
+    margin:0;
+    background:#fff;
+    line-height:0;
+  }
+</style>
+
+<script>
+(function(){
+  var HOST = 'https://clayburton.github.io';
+  var f = document.getElementById('ckp-frame');
+
+  // grow the iframe to the list's real height
+  window.addEventListener('message', function(e){
+    if(e.origin !== HOST) return;
+    var d = e.data || {};
+    if(d.ckp !== 'player') return;
+    if(d.type === 'height' && d.h > 0) f.style.height = d.h + 'px';
+  });
+
+  // nudge the player awake as it scrolls into view (its render loop parks
+  // itself while off-screen so it costs nothing sitting at the page bottom)
+  function ping(){
+    if(!f.contentWindow) return;
+    try { f.contentWindow.postMessage({ ckpHost: 1 }, HOST); } catch(err){}
+  }
+  window.addEventListener('scroll', ping, {passive:true});
+  f.addEventListener('load', function(){ ping(); setTimeout(ping, 400); });
+  window.addEventListener('pageshow', ping);
+})();
+</script>

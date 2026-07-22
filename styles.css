@@ -1,0 +1,315 @@
+/* ============================================================
+   ck-player — a track list where the rule under each song
+   IS that song's waveform, drawn as you listen.
+
+   Sizing rule for this file: NEVER use vh/dvh/svh. The module
+   lives in an iframe whose HEIGHT the parent grows to fit the
+   list — a vh unit inside it is a resize feedback loop.
+   Width units (vw) are safe: width never changes as it grows.
+   ============================================================ */
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --mono:  "Courier Prime", "Courier New", monospace;
+  --serif: "Playfair Display", Georgia, serif;
+
+  --paper: #ffffff;
+  --ink:   #2b2333;          /* brand ink */
+  --muted: #8b8490;
+  --hair:  #e4dfd8;
+  --pink:  #cc5f97;
+  --pink-deep: #b34a82;
+
+  --pad:   clamp(16px, 3.4vw, 40px);   /* module side padding      */
+  --row-h: clamp(74px, 8.2vw, 90px);   /* ONE song's worth of height */
+  --band:  28px;                        /* grab height of the waveform */
+  /* the rule sits high in the row, so it clearly belongs to the title
+     ABOVE it — dead-centre reads as ambiguous between two songs */
+  --rule-y: calc(var(--row-h) * 0.60);
+
+  --c-n:  3.1em;                        /* number / play glyph column */
+  --c-d:  4.6em;                        /* time column                */
+  --c-go: 3.2em;                        /* [ ↗ ] column               */
+}
+
+html, body {
+  width: 100%;
+  background: var(--paper);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;                   /* never a horizontal scrollbar */
+}
+body { overflow-y: hidden; }            /* the parent grows to fit; we never scroll */
+
+.mod {
+  position: relative;                   /* never fixed — this ships inside an iframe */
+  width: 100%;
+  padding: clamp(18px, 2.6vw, 30px) 0 clamp(14px, 2vw, 22px);
+  overflow: hidden;
+}
+
+/* the GL layer sits behind the type and draws every rule */
+#gl {
+  position: absolute;
+  inset: 0;
+  width: 100%; height: 100%;
+  display: block;
+  opacity: 0;                            /* DOM paints first, canvas fades in */
+  transition: opacity .7s ease;
+  pointer-events: none;
+}
+#gl.on { opacity: 1; }
+
+.frame {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 0 var(--pad);
+}
+
+/* ---------------- header ---------------- */
+.head {
+  display: flex;
+  align-items: center;
+  gap: clamp(12px, 2vw, 22px);
+  padding-bottom: clamp(10px, 1.5vw, 16px);
+}
+.head__tag {
+  font-family: var(--mono);
+  font-size: clamp(11px, 1.25vw, 13px);
+  letter-spacing: .2em;
+  color: var(--ink);
+  white-space: nowrap;
+}
+.head__rule { flex: 1 1 auto; height: 1px; background: var(--hair); }
+.head__note {
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: clamp(12px, 1.5vw, 16px);
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+/* ---------------- the list ---------------- */
+.list { list-style: none; }
+
+.row {
+  position: relative;
+  height: var(--row-h);
+  isolation: isolate;
+}
+
+/* full-row play/pause target, sits under the type */
+.row__hit {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  border: 0;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+.row__hit:focus-visible { outline: 1px solid var(--pink); outline-offset: -3px; }
+
+/* the type — never intercepts the pointer */
+.row__grid {
+  position: absolute;
+  left: 0; right: 0; top: 0;
+  height: var(--rule-y);
+  z-index: 2;
+  display: grid;
+  grid-template-columns: var(--c-n) minmax(0, 1fr) auto var(--c-d) var(--c-go);
+  align-items: center;
+  column-gap: clamp(8px, 1.6vw, 24px);
+  pointer-events: none;
+}
+
+/* number → play/pause glyph */
+.row__n {
+  position: relative;
+  font-family: var(--mono);
+  font-size: clamp(11px, 1.25vw, 13px);
+  letter-spacing: .12em;
+  color: var(--muted);
+  transition: color .18s ease;
+}
+.row__num { transition: opacity .16s ease; }
+.row__ico {
+  position: absolute;
+  left: 0; top: 50%;
+  transform: translateY(-50%);
+  display: block;
+  width: 11px; height: 13px;
+  opacity: 0;
+  transition: opacity .16s ease;
+  color: var(--pink);
+}
+.row__ico svg { display: block; width: 100%; height: 100%; fill: currentColor; }
+.row.is-hot  .row__num { opacity: 0; }
+.row.is-hot  .row__ico { opacity: 1; }
+.row.is-live .row__num { opacity: 0; }
+.row.is-live .row__ico { opacity: 1; }
+.row.is-load .row__ico { animation: pulse 1s steps(2, jump-none) infinite; }
+@keyframes pulse { 50% { opacity: .25; } }
+
+.row__t {
+  font-family: var(--mono);
+  font-size: clamp(15px, 2.05vw, 22px);
+  letter-spacing: .04em;
+  text-transform: lowercase;
+  color: var(--ink);
+  white-space: pre;                      /* scramble must not reflow */
+  overflow: hidden;
+  transition: color .2s ease;
+}
+.row__m {
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: clamp(12px, 1.4vw, 15px);
+  color: var(--muted);
+  white-space: nowrap;
+}
+.row__d {
+  font-family: var(--mono);
+  font-size: clamp(11px, 1.25vw, 13px);
+  letter-spacing: .06em;
+  color: var(--muted);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  transition: color .2s ease;
+}
+
+.row__go {
+  z-index: 3;
+  pointer-events: auto;
+  justify-self: end;
+  font-family: var(--mono);
+  font-size: clamp(10px, 1.15vw, 12px);
+  letter-spacing: .06em;
+  text-decoration: none;
+  color: var(--muted);
+  opacity: 0;
+  transition: opacity .2s ease, color .15s ease;
+  padding: .5em .1em;
+}
+.row__go:focus-visible { opacity: 1; outline: 1px solid var(--pink); }
+.row__go:hover { color: var(--pink); }
+.row.is-hot .row__go, .row.is-live .row__go { opacity: 1; }
+
+/* the waveform band — click/drag to scrub the playing track */
+.row__scrub {
+  position: absolute;
+  left: 0; right: 0;
+  top: calc(var(--rule-y) - var(--band) / 2);
+  height: var(--band);
+  z-index: 2;
+  cursor: pointer;
+  touch-action: pan-y;                   /* a finger must still scroll the page */
+}
+.row.is-live .row__scrub { cursor: col-resize; }
+
+/* hover / playing states */
+.row.is-hot  .row__n  { color: var(--ink); }
+.row.is-hot  .row__t  { color: var(--ink); }
+.row.is-live .row__t  { color: var(--pink-deep); }
+.row.is-live .row__d  { color: var(--pink); }
+.row.is-dim  .row__t  { color: var(--muted); }
+.row.is-dim  .row__m  { opacity: .5; }
+
+/* ---------------- footer ---------------- */
+/* 1fr auto 1fr keeps the button dead-centre in the module no matter how wide
+   the bracket link or the signature beside it happen to be */
+.foot {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 16px;
+  padding-top: clamp(14px, 2vw, 20px);
+  border-top: 1px solid var(--hair);
+  margin-top: 2px;
+}
+.foot__link {
+  font-family: var(--mono);
+  font-size: clamp(11px, 1.25vw, 13px);
+  letter-spacing: .16em;
+  text-decoration: none;
+  color: var(--ink);
+  transition: color .15s ease;
+}
+.foot__link:hover { color: var(--pink); }
+.foot__link:empty { display: none; }
+.foot__sign {
+  font-family: var(--mono);
+  font-size: clamp(10px, 1.15vw, 12px);
+  letter-spacing: .2em;
+  color: var(--muted);
+  text-transform: lowercase;
+  justify-self: end;
+}
+
+/* the centre button — same object as the one on the experience-i-am banner */
+.foot__cta {
+  justify-self: center;
+  font-family: var(--mono);
+  font-size: clamp(11px, 1.4vw, 14px);
+  letter-spacing: .18em;
+  text-transform: lowercase;
+  text-decoration: none;
+  white-space: nowrap;
+  color: var(--ink);
+  border: 1px solid var(--ink);
+  background: var(--paper);
+  padding: .8em 1.5em;
+  transition: background .12s ease, color .12s ease, transform .12s ease;
+}
+.foot__cta:hover,
+.foot__cta:focus-visible { background: var(--ink); color: var(--paper); outline: none; }
+.foot__cta:active { transform: scale(.97); }
+.foot__cta:empty { display: none; }
+
+/* touch has no hover, so the play affordance would never appear — show it */
+@media (pointer: coarse) {
+  .row__num { opacity: 0; }
+  .row__ico { opacity: 1; }
+  .row__go  { opacity: 1; }
+}
+
+/* ---------------- narrow ---------------- */
+@media (max-width: 640px) {
+  :root { --c-n: 2.5em; --c-d: 4.2em; --c-go: 2.4em; --band: 26px; }
+  .row__m { display: none; }
+  .row__grid { grid-template-columns: var(--c-n) minmax(0, 1fr) var(--c-d) var(--c-go); }
+  .head__note { font-size: 12px; }
+  .row__go { opacity: 1; }               /* no hover on touch — always show */
+
+  /* button gets its own line above the bracket link + signature */
+  .foot { grid-template-columns: 1fr 1fr; row-gap: 15px; }
+  .foot__cta  { grid-column: 1 / -1; grid-row: 1; }
+  .foot__link { grid-row: 2; }
+  .foot__sign { grid-row: 2; }
+}
+
+/* ---------------- WebGL unavailable: plain, still complete ---------------- */
+.no-gl .row { background:
+  linear-gradient(var(--hair), var(--hair)) 0 var(--rule-y) / 100% 1px no-repeat; }
+.no-gl .row__bar {
+  position: absolute;
+  left: 0; top: var(--rule-y);
+  height: 1px;
+  background: var(--pink);
+  width: calc(var(--p, 0) * 100%);
+  z-index: 3;
+}
+.row__bar { display: none; }
+.no-gl .row__bar { display: block; }
+
+@media (prefers-reduced-motion: reduce) {
+  #gl { transition: none; }
+  .row.is-load .row__ico { animation: none; }
+}

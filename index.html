@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>listen — clay and kelsy</title>
+  <meta name="theme-color" content="#ffffff" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Courier+Prime:ital,wght@0,400;0,700;1,400&family=Playfair+Display:ital,wght@1,400;1,600&display=swap" rel="stylesheet" />
+
+  <link rel="stylesheet" href="styles.css?v=4" />
+
+  <!-- importmap FIRST, always before any modulepreload (a preload that
+       registers before the map breaks bare specifiers from cache) -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.185.1/build/three.module.js"
+    }
+  }
+  </script>
+  <link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/three@0.185.1/build/three.module.js" />
+</head>
+<body>
+  <div id="mod" class="mod">
+    <!-- three.js: paper grain + one living waveform per row -->
+    <canvas id="gl" aria-hidden="true"></canvas>
+
+    <div class="frame">
+      <header class="head">
+        <span class="head__tag" id="headTag">[ listen ]</span>
+        <span class="head__rule" aria-hidden="true"></span>
+        <span class="head__note" id="headNote"></span>
+      </header>
+
+      <ol class="list" id="list"></ol>
+
+      <footer class="foot">
+        <a class="foot__link" id="footLink" target="_top" rel="noopener"></a>
+        <a class="foot__cta" id="footCta" target="_top" rel="noopener"></a>
+        <span class="foot__sign" id="footSign">clay and kelsy</span>
+      </footer>
+    </div>
+
+    <audio id="au" crossorigin="anonymous" preload="none"></audio>
+  </div>
+
+  <script src="waveforms.js?v=1"></script>
+  <script src="playlists.js?v=4"></script>
+  <script type="module" src="app.js?v=11"></script>
+</body>
+</html>
