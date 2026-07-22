@@ -30,14 +30,15 @@ window.PLAYLISTS = {
     note: "clay and kelsy",
     foot: { label: "[ experience i am ]", href: "https://clayandkelsy.com/i-am/" },
     cta:  { label: "[ explore retrospective ]", href: "https://clayandkelsy.com/retrospective/" },
+    /* the ep in album order, then mirror, then three little birds last */
     tracks: [
-      { title: "three little birds", meta: "feat. elder sister", dur: 203.5, src: "assets/three-little-birds.mp3" },
-      { title: "mirror",             meta: "single",             dur: 242.8, src: "assets/mirror.mp3" },
       { title: "insecure",       meta: "i am", dur: 181.0, src: "assets/insecure.mp3",       url: "https://clayandkelsy.com/i-am-insecure/" },
       { title: "you hurt me",    meta: "i am", dur: 218.4, src: "assets/you-hurt-me.mp3",    url: "https://clayandkelsy.com/i-am-you-hurt-me/" },
       { title: "i miss you",     meta: "i am", dur: 213.6, src: "assets/i-miss-you.mp3",     url: "https://clayandkelsy.com/i-am-i-miss-you/" },
       { title: "memories of me", meta: "i am", dur: 197.1, src: "assets/memories-of-me.mp3", url: "https://clayandkelsy.com/i-am-memories-of-me/" },
       { title: "i am",           meta: "i am", dur: 198.7, src: "assets/i-am.mp3",           url: "https://clayandkelsy.com/i-am-i-am/" },
+      { title: "mirror",             meta: "single",             dur: 242.8, src: "assets/mirror.mp3" },
+      { title: "three little birds", meta: "feat. elder sister", dur: 203.5, src: "assets/three-little-birds.mp3" },
     ],
   },
 
