@@ -119,6 +119,21 @@ fake listen), `.renderOnce()`, `.height()`, `.gl`.
 
 ## Status
 
-Built and verified locally (2026-07-21). **Not deployed yet** — when you want it
-live: create `Clayburton/ck-player`, push, flip it public, enable Pages
-(Settings → Pages → branch `main` `/root`), then paste the embed block.
+Pushed to `Clayburton/ck-player` (2026-07-21). The repo is **PRIVATE**, so two
+manual steps are still needed before the embed will load anything:
+
+1. Make the repo **public** — GitHub Pages is blocked on private repos on the
+   free plan.
+2. Settings → Pages → branch `main`, folder `/root`.
+
+Then it's live at `https://clayburton.github.io/ck-player/` and
+`wordpress-embed.html` can go into a Custom HTML block at the bottom of
+`/music/`.
+
+Outstanding:
+
+- **mirror** — `Music for player 1/mirror/` has artwork but no audio. Drop the
+  file in, encode it, run `tools/waveforms.py`, uncomment the row in
+  `playlists.js`.
+- **three little birds** has no `[ ↗ ]` link yet — `/three-little-birds/` is 404
+  until that project gets its own Pages flip. Add `url:` to the track then.
