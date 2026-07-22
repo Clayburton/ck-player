@@ -54,7 +54,6 @@ const audio  = document.getElementById("au");
 
 document.getElementById("headTag").textContent  = LIST.tag  || "[ listen ]";
 document.getElementById("headNote").textContent = LIST.note || "";
-document.getElementById("footSign").textContent = LIST.sign || "clay and kelsy";
 const footLink = document.getElementById("footLink");
 if (LIST.foot && LIST.foot.href) {
   footLink.textContent = LIST.foot.label || "[ more ]";

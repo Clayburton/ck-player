@@ -29,14 +29,10 @@ window.PLAYLISTS = {
     tag:  "[ listen ]",
     note: "clay and kelsy",
     foot: { label: "[ experience i am ]", href: "https://clayandkelsy.com/i-am/" },
-    sign: "clay and kelsy",
     cta:  { label: "[ explore retrospective ]", href: "https://clayandkelsy.com/retrospective/" },
     tracks: [
       { title: "three little birds", meta: "feat. elder sister", dur: 203.5, src: "assets/three-little-birds.mp3" },
-      /* mirror goes here — drop the audio into "Music for player 1/mirror/",
-         re-run tools/waveforms.py, and uncomment:
-      { title: "mirror", meta: "single", dur: 0, src: "assets/mirror.mp3" },
-      */
+      { title: "mirror",             meta: "single",             dur: 242.8, src: "assets/mirror.mp3" },
       { title: "insecure",       meta: "i am", dur: 181.0, src: "assets/insecure.mp3",       url: "https://clayandkelsy.com/i-am-insecure/" },
       { title: "you hurt me",    meta: "i am", dur: 218.4, src: "assets/you-hurt-me.mp3",    url: "https://clayandkelsy.com/i-am-you-hurt-me/" },
       { title: "i miss you",     meta: "i am", dur: 213.6, src: "assets/i-miss-you.mp3",     url: "https://clayandkelsy.com/i-am-i-miss-you/" },
@@ -50,7 +46,6 @@ window.PLAYLISTS = {
     tag:  "[ listen ]",
     note: "i am — an ep",
     foot: { label: "[ experience i am ]", href: "https://clayandkelsy.com/i-am/" },
-    sign: "clay and kelsy",
     cta:  { label: "[ explore retrospective ]", href: "https://clayandkelsy.com/retrospective/" },
     /* encoded from the album masters in "Music for player 1/i am" */
     tracks: [
@@ -67,7 +62,6 @@ window.PLAYLISTS = {
     tag:  "[ listen ]",
     note: "two from the ep",
     foot: { label: "[ the whole ep ]", href: "https://clayandkelsy.com/i-am/" },
-    sign: "clay and kelsy",
     cta:  { label: "[ explore retrospective ]", href: "https://clayandkelsy.com/retrospective/" },
     tracks: [
       { title: "i am",     meta: "i am", dur: 198.7, src: "assets/i-am.mp3",     url: "https://clayandkelsy.com/i-am-i-am/" },

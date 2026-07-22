@@ -223,13 +223,14 @@ body { overflow-y: hidden; }            /* the parent grows to fit; we never scr
 .row.is-dim  .row__m  { opacity: .5; }
 
 /* ---------------- footer ---------------- */
-/* 1fr auto 1fr keeps the button dead-centre in the module no matter how wide
-   the bracket link or the signature beside it happen to be */
+/* two bracket links, one to each corner. They wrap rather than collide on a
+   narrow screen — together they're wider than a phone. */
 .foot {
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
-  align-items: center;
-  gap: 16px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px 16px;
   padding-top: clamp(14px, 2vw, 20px);
   border-top: 1px solid var(--hair);
   margin-top: 2px;
@@ -244,18 +245,9 @@ body { overflow-y: hidden; }            /* the parent grows to fit; we never scr
 }
 .foot__link:hover { color: var(--pink); }
 .foot__link:empty { display: none; }
-.foot__sign {
-  font-family: var(--mono);
-  font-size: clamp(10px, 1.15vw, 12px);
-  letter-spacing: .2em;
-  color: var(--muted);
-  text-transform: lowercase;
-  justify-self: end;
-}
-
-/* the centre link — identical to [ experience i am ] beside it, just centred */
+/* bottom-right link — identical to [ experience i am ] in the other corner */
 .foot__cta {
-  justify-self: center;
+  margin-left: auto;              /* stays right even when it wraps to its own line */
   font-family: var(--mono);
   font-size: clamp(11px, 1.25vw, 13px);
   letter-spacing: .16em;
@@ -284,11 +276,6 @@ body { overflow-y: hidden; }            /* the parent grows to fit; we never scr
   .head__note { font-size: 12px; }
   .row__go { opacity: 1; }               /* no hover on touch — always show */
 
-  /* button gets its own line above the bracket link + signature */
-  .foot { grid-template-columns: 1fr 1fr; row-gap: 15px; }
-  .foot__cta  { grid-column: 1 / -1; grid-row: 1; }
-  .foot__link { grid-row: 2; }
-  .foot__sign { grid-row: 2; }
 }
 
 /* ---------------- WebGL unavailable: plain, still complete ---------------- */

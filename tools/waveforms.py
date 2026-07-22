@@ -46,6 +46,7 @@ SONGS = {
     "i-miss-you":         "i am/03 I Miss You.wav",
     "memories-of-me":     "i am/04 Memories of Me 2.wav",
     "i-am":               "i am/05 I am.wav",
+    "mirror":             "mirror/Clay&Kelsy-Mirror4424_JG_Master_2024-12-17 (1).mp3",
     "three-little-birds": "Three Little birds/Three Little Birds (feat. Elder Sister) - Clay and Kelsy (youtube).mp3",
 }
 
